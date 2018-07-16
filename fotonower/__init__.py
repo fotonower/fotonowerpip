@@ -3,18 +3,24 @@ import requests
 import json
 import sys
 
-# le token provient de la page www.fotonower.com/me/developer
+# le token doit venir de mongodb ainsi qu'eventuellement l'host
 
 class FotonowerConnect:
-    def __init__(self, token, host = "www.fotonower.com", protocol = "http", log_level = 1):
+    def __init__(self, token, host = "www.fotonower.com", protocol = "https"):
         self.protocol = protocol
         self.host = host
         self.api_version = "/api/v1"
         self.upload_endpoint = "/secured/photo/upload"
+
         self.face_bucket = "/secured/velours/faceBucket"
         self.features = "/secured/velours/features"
+        self.set_current = "/secured/datou/current/set"
+        self.portfolioAppend = "/secured/portfolio/save"
         self.portfolioSavePost = "/portfolio/savePost"
         self.getNewPortfolio = "/secured/portfolio/new"
+        self.pids_to_add = "list_pids_to_add"
+        self.only_add_arg = "only_add=1"
+        self.port_id_arg = "portfolio_id"
         self.token_arg = "token"
         self.token = str(token)
         self.lf_arg = "list_photo_ids"
@@ -22,14 +28,11 @@ class FotonowerConnect:
         self.nb_bucket_arg = "nb_bucket"
         self.photo_hashtag_type_arg = "photo_hashtag_type"
         self.photo_desc_type_arg = "photo_desc_type"
-        self.log = log_level
 
 
-    def get_new_portfolio(self, portfolio_name = "", list_photo_ids = [], verbose = False):
+    def get_new_portfolio(self, portfolio_name = "", verbose = False):
 
-        url = "http://" + self.host + self.api_version + self.getNewPortfolio
-
-        list_photo_ids_csv = ",".join(map(str, list_photo_ids))
+        url = self.protocol + "://" + self.host + self.api_version + self.getNewPortfolio
 
         args_get = {}
         if portfolio_name != "":
@@ -40,41 +43,27 @@ class FotonowerConnect:
         if args_get != {} :
             url += "?" + "&".join(map(lambda x : str(x) + "=" + str(args_get[x]),args_get))
 
-# does-this works ?
-# MG 26/04/18 for a post request maybie
-#        r = requests.get(url, data={'portfolio_name':portfolio_name, "access_token" : self.token})
         r = requests.get(url)
-
-        portfolio_id = 0
 
         if r.status_code == 200 :
             res_json = json.loads(r.content.decode("utf8"))
-            if self.log > 1 :
+            if verbose :
                 print (res_json)
-            elif self.log == 1:
-                print("request status OK")
-            #portfolio_id = res_json['portfolio_id']
             if type(res_json) == type(0) :
                 portfolio_id = res_json
             elif type(res_json) == type({}) :
                 if 'portfolio_id' in res_json :
                     portfolio_id = res_json['portfolio_id']
-            #print portfolio_id
         else :
-            if self.log > 0:
-                print (" Status : " + str(r.status_code))
-                print (" Content : " + str(r.content))
-                print (" All Response : " + str(r))
-            else:
-                print("Error : " + str(r.status_code))
-        return portfolio_id
+            print (" Status : " + str(r.status_code))
+            print (" Content : " + str(r.content))
+            print (" All Response : " + str(r))
 
+        return portfolio_id
 
     def create_portfolio(self, portfolio_name, list_photo_ids = [], verbose = False, arg_aux = {}):
 
-        url = "http://" + self.host + self.api_version + self.portfolioSavePost
-
-        import json, requests
+        url = self.protocol +"://" + self.host + self.api_version + self.portfolioSavePost
 
         list_photo_ids_csv = ",".join(map(str, list_photo_ids))
 
@@ -100,8 +89,97 @@ class FotonowerConnect:
         return portfolio_id
 
 
+    def create_portfolio_by_batch(self, portfolio_name, list_photo_ids = [], verbose = False, batch_size=500,arg_aux = {}):
+        url = self.protocol +"://" + self.host + self.api_version + self.portfolioSavePost
 
-    # "compute_classification" : False forced to false (for svm computation)
+
+        list_photo_ids_csv = ",".join(map(str, list_photo_ids))
+
+        data_to_send = {'portfolio_name': portfolio_name, "access_token": self.token,
+                        "list_photos_ids": list_photo_ids_csv[:batch_size]}
+
+        data_to_send.update(arg_aux)
+
+        r = requests.post(url, data=data_to_send)
+        portfolio_id = 0
+
+        if r.status_code == 200:
+            res_json = json.loads(r.content)
+            if verbose:
+                print (res_json)
+            portfolio_id = res_json['portfolio_id']
+            # print portfolio_id
+        else:
+            print (" Status : " + str(r.status_code))
+            print (" Content : " + str(r.content))
+            print (" All Response : " + str(r))
+
+        count=0
+        data_to_send={}
+        list_photo_to_send=[]
+        for el in list_photo_ids_csv[batch_size:]:
+
+            if count==batch_size:
+                data_to_send={'portfolio_id':portfolio_id, "acces_token":self.token, "list_photo_ids":list_photo_to_send}
+                data_to_send.update(arg_aux)
+
+                r=requests.post(url, data=data_to_send)
+                count=0
+                list_photo_to_send=[]
+                if r.status_code==200:
+                    res_json=json.loads(r.content)
+                    if verbose:
+                        print(res_json)
+                else:
+                    print (" Status : " + str(r.status_code))
+                    print (" Content : " + str(r.content))
+                    print (" All Response : " + str(r))
+            else:
+                list_photo_to_send.append(el)
+                count += 1
+        if count>0:
+            data_to_send={'portfolio_id':portfolio_id, "access_token":self.token, "list_photo_ids":list_photo_to_send}
+            data_to_send.update(arg_aux)
+
+            r=requests.post(url,data=data_to_send)
+            if r.status_code==200:
+                res_json.loads(r.content)
+                if verbose:
+                    print(res_json)
+            else:
+                print (" Status : " + str(r.status_code))
+                print (" Content : " + str(r.content))
+                print (" All Response : " + str(r))
+
+        return portfolio_id
+
+    def append_to_port(self,list_pids_csv,port_id,verbose = False):
+        if list_pids_csv == "":
+            print("please provide a list of pids to append")
+            return 0
+        if int(port_id) == 0:
+            print("please provide a valid portfolio_id")
+            return 0
+
+        url = self.protocol+"://" + self.host + self.api_version + self.portfolioAppend + "?" + self.only_add_arg + "&"
+        url += self.port_id_arg + "=" + str(port_id) + "&" + self.lf_arg + "=" + list_pids_csv + "&" + self.token_arg + "=" + self.token
+        r = requests.get(url)
+        if r.status_code == 200 :
+            res_json = json.loads(r.content.decode("utf8"))
+            if verbose :
+                print (res_json)
+            if type(res_json) == type(0) :
+                portfolio_id = res_json
+            elif type(res_json) == type({}) :
+                if 'portfolio_id' in res_json :
+                    portfolio_id = res_json['portfolio_id']
+        else :
+            print (" Status : " + str(r.status_code))
+            print (" Content : " + str(r.content))
+            print (" All Response : " + str(r))
+
+        return portfolio_id
+
     def upload_medias(self, list_filenames, portfolio_id = 0, upload_small = False, hashtags = [], verbose = False, arg_aux = {}, compute_classification=False) :
       try :
         if verbose:
@@ -120,7 +198,7 @@ class FotonowerConnect:
                 print(list_filenames[i])
                 sys.stdout.flush()
             key = "file" + str(i)
-            map_file_id_filename[key] = list_filenames[i]#.replace('\xc2\xa', ' ')
+            map_file_id_filename[key] = list_filenames[i]
             try:
                 files[key] = open(list_filenames[i], 'rb')
             except Exception as e:
@@ -129,7 +207,7 @@ class FotonowerConnect:
                 print("error while trying to upload this file need to reupload it manually in portfolio " + str(portfolio_id))
 
         # we could pass others arguments if needed
-        data_to_send = {'portfolio_id':portfolio_id, "upload_small" : upload_small, "compute_classification" : compute_classification}
+        data_to_send = {'portfolio_id':portfolio_id, "upload_small" : upload_small, "compute_classification" : compute_classification, "hashtags":";".join(hashtags)}
         data_to_send.update(arg_aux)
         if verbose:
             print("after data_to_send, before sending request")
@@ -146,21 +224,6 @@ class FotonowerConnect:
             print ("Result OK !")
             sys.stdout.flush()
             res_json = json.loads(r.content.decode("utf8"))
-            #martigan 250418 : @moilerat je ne suis pas trop sur de ce comportement mais il faut que l on récupere
-            # les résultats quand il y a eu un traitement, l association filename/photo_id me parait moins importante
-            if "result" in res_json and "map_files_photo_id" in res_json:
-                map_filename_photo_id = {}
-                map_files_photo_id = res_json["map_files_photo_id"]
-                for f in map_files_photo_id:
-                    photo_id = map_files_photo_id[f]
-                    if f in map_file_id_filename:
-                        filename = map_file_id_filename[f]
-                        map_filename_photo_id[filename] = photo_id
-                    else:
-                        print("Missing filename !")
-
-                return map_filename_photo_id,res_json['result']
-
 
             if "map_files_photo_id" in res_json:
                 map_filename_photo_id = {}
@@ -172,20 +235,17 @@ class FotonowerConnect:
                         map_filename_photo_id[filename] = photo_id
                     else :
                         print("Missing filename !")
-
-                return map_filename_photo_id
-
-#            if "photo_ids" in res_json :
-#                print("This case can't be treated correctly WARNING !")
-#                return res_json["photo_ids"]
+                dict_cur = {"list_datou_current": ""}
+                if "list_datou_current" in res_json:
+                    dict_cur["list_datou_current"] = res_json["list_datou_current"]
+                return map_filename_photo_id,dict_cur
 
             if 'photo_id' in res_json :
                 if len(list_filenames) > 1 :
                     print ("Some filename were not uploaded !")
-                #return res_json['photo_id']
                 return {list_filenames[0]:res_json['photo_id']}
         else :
-            print(str(r.status))
+            print(str(r.status_code))
 
         for line in r.content.split("\n") :
             if "This exception" in line:
@@ -194,39 +254,8 @@ class FotonowerConnect:
         return 0
       except Exception as e:
           sys.stdout.flush()
-          print("ERROR IN API l 160 " + str(e))
+          print("ERROR IN API l 184 " + str(e))
           return 0
-
-
-
-    def upload_media(self, filename, portfolio_id = 0, hashtags = [], verbose = False) :
-      try :
-        url = self.protocol+ "://" + self.host + self.api_version + self.upload_endpoint + "?" + self.token_arg + "=" + self.token
-
-        if verbose :
-            print (" Upload media :  " + filename + " : url : " + url)
-
-        # we could pass others arguments if needed
-        r = requests.post(url, files={'file': open(filename, 'rb')}, data={'portfolio_id':portfolio_id})
-
-        if verbose :
-            print (r)
-            #print (r.response)
-            print (r.content)
-
-        if r.status_code == 200 :
-            print ("Result OK !")
-            res_json = json.loads(r.content.decode("utf8"))
-
-            if 'photo_id' in res_json :
-                return res_json['photo_id']
-
-        return 0
-      except Exception as e:
-          print("ERROR IN API l189 " + str(e))
-          return 0
-
-
 
     def faceBucket(self, list_of_face_as_photo_id, bibnumber = 0, nb_bucket = 6, photo_hashtag_type = 67, photo_desc_type = 0, verbose = False) :
       try :
@@ -252,12 +281,7 @@ class FotonowerConnect:
         if verbose :
             print (" faceBucket : url : " + url)
 
-        # we could pass others arguments if needed
         r = requests.post(url)
-
-        #if verbose :
-            #print (r)
-            #print (r.content)
 
         if r.status_code == 200 :
             print ("Result OK !")
@@ -269,9 +293,6 @@ class FotonowerConnect:
 
             return res_to_send
 
-            #if 'photo_id' in res_json and len(res_json['photo_id']) :
-            #    return res_json['photo_id'][0]
-
         return {}
       except Exception as e :
           print (str(e))
@@ -280,7 +301,6 @@ class FotonowerConnect:
 
 
     def veloursFeature(self, list_photo_ids, photo_desc_type = 0, verbose = False) :
-
         list = ",".join(map(str, list_photo_ids))
         url = self.protocol+ "://" + self.host + self.api_version + self.features + "?" + self.token_arg + "=" + self.token + "&" + self.lf_arg + "=" + list
         url += "&" + self.photo_desc_type_arg + "=" + str(photo_desc_type)
@@ -288,12 +308,7 @@ class FotonowerConnect:
         if verbose :
             print (" faceBucket : url : " + url)
 
-        # we could pass others arguments if needed
         r = requests.get(url)
-
-        #if verbose :
-            #print (r)
-            #print (r.content)
 
         if r.status_code == 200 :
             print ("Result OK !")
@@ -301,9 +316,25 @@ class FotonowerConnect:
 
             return res_json
 
-            #if 'photo_id' in res_json and len(res_json['photo_id']) :
-            #    return res_json['photo_id'][0]
-
         return {}
 
-
+    def set_datou_current(self,mtr_portfolio_id = 0,list_photo_csv = "",mtd_id= 0,mtr_user_id = 0,input_csv = "",verbose = False):
+        url = self.protocol + "://" + self.host + self.api_version + self.set_current + "?"
+        list_param = ["token="+self.token]
+        if mtr_portfolio_id != 0:
+            list_param.append("mtr_portfolio_id=" + str(mtr_portfolio_id))
+        elif list_photo_csv != "":
+            list_param.append("mtr_photo_id=" + list_photo_csv)
+        if mtd_id != 0:
+            list_param.append("mtr_datou_id="+str(mtd_id))
+        if mtr_user_id != 0:
+            list_param.append("user="+str(mtr_user_id))
+        if input_csv != "":
+            list_param.append("input_csv="+input_csv)
+        url += "&".join(list_param)
+        r = requests.get(url)
+        if r.status_code == 200:
+            if verbose:
+                print("Result OK")
+            return json.loads(r.content)
+        return {}
