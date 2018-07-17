@@ -9,12 +9,15 @@ class FotonowerConnect:
     def __init__(self, token, host = "www.fotonower.com", protocol = "https"):
         self.protocol = protocol
         self.host = host
+        #"localhost:9000"
+#        self.root_fotonower = "www.fotonower.com"
         self.api_version = "/api/v1"
         self.upload_endpoint = "/secured/photo/upload"
 
         self.face_bucket = "/secured/velours/faceBucket"
         self.features = "/secured/velours/features"
         self.set_current = "/secured/datou/current/set"
+        self.get_result = "/secured/datou/result"
         self.portfolioAppend = "/secured/portfolio/save"
         self.portfolioSavePost = "/portfolio/savePost"
         self.getNewPortfolio = "/secured/portfolio/new"
@@ -43,17 +46,23 @@ class FotonowerConnect:
         if args_get != {} :
             url += "?" + "&".join(map(lambda x : str(x) + "=" + str(args_get[x]),args_get))
 
+# does-this works ?
+#        r = requests.get(url, data={'portfolio_name':portfolio_name, "access_token" : self.token})
         r = requests.get(url)
+
+        #portfolio_id = 0
 
         if r.status_code == 200 :
             res_json = json.loads(r.content.decode("utf8"))
             if verbose :
                 print (res_json)
+            #portfolio_id = res_json['portfolio_id']
             if type(res_json) == type(0) :
                 portfolio_id = res_json
             elif type(res_json) == type({}) :
                 if 'portfolio_id' in res_json :
                     portfolio_id = res_json['portfolio_id']
+            #print portfolio_id
         else :
             print (" Status : " + str(r.status_code))
             print (" Content : " + str(r.content))
@@ -168,11 +177,13 @@ class FotonowerConnect:
             res_json = json.loads(r.content.decode("utf8"))
             if verbose :
                 print (res_json)
+            #portfolio_id = res_json['portfolio_id']
             if type(res_json) == type(0) :
                 portfolio_id = res_json
             elif type(res_json) == type({}) :
                 if 'portfolio_id' in res_json :
                     portfolio_id = res_json['portfolio_id']
+            #print portfolio_id d207b0757670783154d2b28419830450
         else :
             print (" Status : " + str(r.status_code))
             print (" Content : " + str(r.content))
@@ -180,6 +191,7 @@ class FotonowerConnect:
 
         return portfolio_id
 
+    # "compute_classification" : False forced to false (for svm computation)
     def upload_medias(self, list_filenames, portfolio_id = 0, upload_small = False, hashtags = [], verbose = False, arg_aux = {}, compute_classification=False) :
       try :
         if verbose:
@@ -198,7 +210,7 @@ class FotonowerConnect:
                 print(list_filenames[i])
                 sys.stdout.flush()
             key = "file" + str(i)
-            map_file_id_filename[key] = list_filenames[i]
+            map_file_id_filename[key] = list_filenames[i]#.replace('\xc2\xa', ' ')
             try:
                 files[key] = open(list_filenames[i], 'rb')
             except Exception as e:
@@ -240,9 +252,14 @@ class FotonowerConnect:
                     dict_cur["list_datou_current"] = res_json["list_datou_current"]
                 return map_filename_photo_id,dict_cur
 
+#            if "photo_ids" in res_json :
+#                print("This case can't be treated correctly WARNING !")
+#                return res_json["photo_ids"]
+
             if 'photo_id' in res_json :
                 if len(list_filenames) > 1 :
                     print ("Some filename were not uploaded !")
+                #return res_json['photo_id']
                 return {list_filenames[0]:res_json['photo_id']}
         else :
             print(str(r.status_code))
@@ -281,7 +298,12 @@ class FotonowerConnect:
         if verbose :
             print (" faceBucket : url : " + url)
 
+        # we could pass others arguments if needed
         r = requests.post(url)
+
+        #if verbose :
+            #print (r)
+            #print (r.content)
 
         if r.status_code == 200 :
             print ("Result OK !")
@@ -292,6 +314,9 @@ class FotonowerConnect:
                 res_to_send[int(k)] = res_json[k]
 
             return res_to_send
+
+            #if 'photo_id' in res_json and len(res_json['photo_id']) :
+            #    return res_json['photo_id'][0]
 
         return {}
       except Exception as e :
@@ -308,13 +333,21 @@ class FotonowerConnect:
         if verbose :
             print (" faceBucket : url : " + url)
 
+        # we could pass others arguments if needed
         r = requests.get(url)
+
+        #if verbose :
+            #print (r)
+            #print (r.content)
 
         if r.status_code == 200 :
             print ("Result OK !")
             res_json = json.loads(r.content)
 
             return res_json
+
+            #if 'photo_id' in res_json and len(res_json['photo_id']) :
+            #    return res_json['photo_id'][0]
 
         return {}
 
@@ -331,6 +364,25 @@ class FotonowerConnect:
             list_param.append("user="+str(mtr_user_id))
         if input_csv != "":
             list_param.append("input_csv="+input_csv)
+        url += "&".join(list_param)
+        r = requests.get(url)
+        if r.status_code == 200:
+            if verbose:
+                print("Result OK")
+            return json.loads(r.content)
+        return {}
+
+    def get_datou_result(self,mtr_portfolio_id = 0,list_current_ids_csv = "",limit=20,offset=0, verbose = False):
+        url = self.protocol + "://" + self.host + self.api_version +self.get_result +"?"
+        list_param = ["token="+ self.token]
+        if mtr_portfolio_id != 0:
+            list_param.append("mtr_portfolio_id="+str(mtr_portfolio_id))
+        if list_current_ids_csv != "":
+            list_param.append("datou_current_ids="+list_current_ids_csv)
+        if limit != 0:
+            list_param.append("limit=" + str(limit))
+            if offset != 0:
+                list_param.append("offset="+str(offset))
         url += "&".join(list_param)
         r = requests.get(url)
         if r.status_code == 200:
