@@ -31,6 +31,7 @@ class FotonowerConnect:
         self.nb_bucket_arg = "nb_bucket"
         self.photo_hashtag_type_arg = "photo_hashtag_type"
         self.photo_desc_type_arg = "photo_desc_type"
+        # TODO request toward an endpoint that verify token
 
 
     def get_new_portfolio(self, portfolio_name = "", verbose = False):
@@ -192,83 +193,102 @@ class FotonowerConnect:
         return portfolio_id
 
     # "compute_classification" : False forced to false (for svm computation)
-    def upload_medias(self, list_filenames, portfolio_id = 0, upload_small = False, hashtags = [], verbose = False, arg_aux = {}, compute_classification=False) :
+    def upload_medias(self, list_filenames, portfolio_id = 0, upload_small = False, hashtags = [], verbose = False, arg_aux = {}, compute_classification=False, auto_treatment=True) :
       try :
         if verbose:
             print("in upload media")
             sys.stdout.flush()
         url = self.protocol+ "://" + self.host + self.api_version + self.upload_endpoint + "?" + self.token_arg + "=" + self.token
-
+        if not auto_treatment:
+            url += "&datou=0"
         if verbose :
             print (" Upload medias :  " + str(list_filenames) + " : url : " + url)
             sys.stdout.flush()
+        if type(list_filenames) == type(str()) or type(list_filenames) == type(u'a'):
+            import os
+            if os.path.isdir(list_filenames):
+                list_filenames = [os.path.join(list_filenames, x) for x in sorted(os.listdir(list_filenames))]
+            elif os.path.isfile(list_filenames):
+                list_filenames = [list_filenames]
+            else:
+                print("error {} is not a folder nor a file".format(list_filenames))
+                return {"error": "{} is not a folder nor a file".format(list_filenames)},{}
+        maxi_list_files = []
+        while len(list_filenames):
+            maxi_list_files.append(list_filenames[0:50])
+            list_filenames = list_filenames[50:]
+        map_filename_photo_id = {}
+        dict_cur = {"list_datou_current": []}
+        for list_filenames in maxi_list_files:
+            files = {}
+            map_file_id_filename= {}
+            for i in range(len(list_filenames)) :
+                if verbose :
+                    print(list_filenames[i])
+                    sys.stdout.flush()
+                key = "file" + str(i)
+                map_file_id_filename[key] = list_filenames[i]#.replace('\xc2\xa', ' ')
+                try:
+                    files[key] = open(list_filenames[i], 'rb')
+                except Exception as e:
+                    print(e)
+                    print(list_filenames[i])
+                    print("error while trying to upload this file need to reupload it manually in portfolio " + str(portfolio_id))
 
-        files = {}
-        map_file_id_filename= {}
-        for i in range(len(list_filenames)) :
-            if verbose :
-                print(list_filenames[i])
-                sys.stdout.flush()
-            key = "file" + str(i)
-            map_file_id_filename[key] = list_filenames[i]#.replace('\xc2\xa', ' ')
-            try:
-                files[key] = open(list_filenames[i], 'rb')
-            except Exception as e:
-                print(e)
-                print(list_filenames[i])
-                print("error while trying to upload this file need to reupload it manually in portfolio " + str(portfolio_id))
 
-        # we could pass others arguments if needed
-        data_to_send = {'portfolio_id':portfolio_id, "upload_small" : upload_small, "compute_classification" : compute_classification, "hashtags":";".join(hashtags)}
-        data_to_send.update(arg_aux)
-        if verbose:
-            print("after data_to_send, before sending request")
-        r = requests.post(url, files=files, data=data_to_send)
-        if verbose:
-            print("after request")
-        sys.stdout.flush()
-        if verbose :
-            print (r)
-            #print (r.response)
-            print (r.content)
-
-        if r.status_code == 200 :
-            print ("Result OK !")
+            data_to_send = {'portfolio_id':portfolio_id, "upload_small" : upload_small, "compute_classification" : compute_classification, "hashtags":";".join(hashtags)}
+            data_to_send.update(arg_aux)
+            if verbose:
+                print("after data_to_send, before sending request")
+            r = requests.post(url, files=files, data=data_to_send)
+            if verbose:
+                print("after request")
             sys.stdout.flush()
-            res_json = json.loads(r.content.decode("utf8"))
+            if verbose :
+                print (r)
+            #print (r.response)
+                print (r.content)
 
-            if "map_files_photo_id" in res_json:
-                map_filename_photo_id = {}
-                map_files_photo_id = res_json["map_files_photo_id"]
-                for f in map_files_photo_id :
-                    photo_id = map_files_photo_id[f]
-                    if f in map_file_id_filename :
-                        filename = map_file_id_filename[f]
-                        map_filename_photo_id[filename] = photo_id
-                    else :
-                        print("Missing filename !")
-                dict_cur = {"list_datou_current": ""}
-                if "list_datou_current" in res_json:
-                    dict_cur["list_datou_current"] = res_json["list_datou_current"]
-                return map_filename_photo_id,dict_cur
+            if r.status_code == 200 :
+                for f in files:
+                    files[f].close()
+                print ("Result OK !")
+                sys.stdout.flush()
+                res_json = json.loads(r.content.decode("utf8"))
+
+                if "map_files_photo_id" in res_json:
+                    map_files_photo_id = res_json["map_files_photo_id"]
+                    for f in map_files_photo_id :
+                        photo_id = map_files_photo_id[f]
+                        if f in map_file_id_filename :
+                            filename = map_file_id_filename[f]
+                            map_filename_photo_id[filename] = photo_id
+                        else :
+                            print("Missing filename !")
+                    if "list_datou_current" in res_json:
+                        dict_cur["list_datou_current"] += res_json["list_datou_current"]
 
 #            if "photo_ids" in res_json :
 #                print("This case can't be treated correctly WARNING !")
 #                return res_json["photo_ids"]
 
-            if 'photo_id' in res_json :
-                if len(list_filenames) > 1 :
-                    print ("Some filename were not uploaded !")
+            # martigan 28/08/2018 : @moilerat je ne comprends pas trop a quoi sert cette partie de code? cas d'erreur de l API?
+                if 'photo_id' in res_json :
+                    if len(list_filenames) > 1 :
+                        print ("Some filename were not uploaded !")
                 #return res_json['photo_id']
-                return {list_filenames[0]:res_json['photo_id']}
-        else :
-            print(str(r.status_code))
+                    if len(list_filenames) > 0 :
+                        return {list_filenames[0]:res_json['photo_id']},{}
+                    else :
+                        return {},{}
+            else :
+                print(str(r.status_code))
 
-        for line in r.content.split("\n") :
-            if "This exception" in line:
-                print (line)
+            for line in r.content.split("\n") :
+                if "This exception" in line:
+                    print (line)
+        return map_filename_photo_id, dict_cur
 
-        return 0
       except Exception as e:
           sys.stdout.flush()
           print("ERROR IN API l 184 " + str(e))
