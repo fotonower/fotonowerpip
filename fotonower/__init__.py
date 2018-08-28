@@ -284,7 +284,7 @@ class FotonowerConnect:
             else :
                 print(str(r.status_code))
 
-            for line in r.content.split("\n") :
+            for line in r.content.decode("utf8").split("\n") :
                 if "This exception" in line:
                     print (line)
         return map_filename_photo_id, dict_cur
