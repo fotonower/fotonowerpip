@@ -251,7 +251,7 @@ class FotonowerConnect:
             data_to_send = {'portfolio_id':portfolio_id, "upload_small" : upload_small, "compute_classification" : compute_classification, "hashtags":";".join(hashtags)}
             data_to_send.update(arg_aux)
             if len(list_datou_ids) != 0 :
-                csv_datou_ids = "\",\"".join([str(item) for item in list_datou_ids])
+                csv_datou_ids = ",".join([str(item) for item in list_datou_ids])
                 str_compute_classification = "{'list_datou_ids':["+csv_datou_ids+"]"
                 #, 'is_live': true}
                 if is_live :
@@ -259,7 +259,8 @@ class FotonowerConnect:
                 else :
                     str_is_live = ", 'is_live': false}"
                 str_compute_classification += str_is_live
-                data_to_send["compute_classification"]  = str_compute_classification
+                data_to_send["classification_actions"]  = str_compute_classification
+                data_to_send["compute_classification"] = True
 
                 print("mettre a jour le compute_classification : ")
                 print(str(data_to_send))
@@ -435,7 +436,20 @@ class FotonowerConnect:
         if r.status_code == 200:
             if verbose:
                 print("Result OK")
-            return json.loads(r.content)
+
+            json_param = {}
+            try :
+                try :
+                    from StringIO import StringIO
+                except Exception as ee :
+                    from io import StringIO
+
+                    json_param = json.load(StringIO(r.content))
+            except Exception as e :
+                    print("Error in json parser in datou_step create in datou create: " + str(e))
+
+
+            return json_param
         return {}
 
 

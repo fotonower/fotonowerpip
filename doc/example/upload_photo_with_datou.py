@@ -1,7 +1,8 @@
+__author__ = 'moilerat'
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import fotonower as ftn
+import mtr.lib.fotonower_api.fotonower_connect as ftn
 import os
 
 if __name__ == "__main__":
@@ -36,12 +37,15 @@ if __name__ == "__main__":
         exit(2)
     files = [x.file]
 
-    map_result_insert_aux, list_current_datou_ids = fc.upload_medias(files, list_datou_ids=[x.datou], is_live=is_live, upload_small=True, verbose=True)
+    map_result_insert_aux, list_current_datou_ids = fc.upload_medias(files, list_datou_ids=[x.datou], is_live=x.is_live, upload_small=True, verbose=True)
 
     print(map_result_insert_aux)
     print(map_result_insert_aux["res_json"])
     #{'mtr_datou_id':9,'is_live':true,'list_datou_ids_unused':[19],"manual_labelling":{"manual":456,"hashtag_type":451}}
-    
+
+    if len(map_result_insert_aux['res_json']['result']) > 0:
+        print(map_result_insert_aux['res_json']['result'][0]['result'])
+
     # to get results, may take some time depending on treatment asked
-    res_datou = fc.get_datou_result(list_current_ids_csv=','.join(list_current_datou_ids))
+    res_datou = fc.get_datou_result(datou_current_ids_dict=list_current_datou_ids)
     print(res_datou)
