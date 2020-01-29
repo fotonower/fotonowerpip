@@ -1,4 +1,11 @@
 # -*- coding: utf-8 -*-
+__author__ = 'moilerat', 'stephane poirier'
+#
+# # Velours copyright 2014-2019 Fotonower - LICENSETOBEDEFINED
+#
+#! Scripts accessing fotonower api
+#
+
 import requests
 import json
 import sys
@@ -194,7 +201,7 @@ class FotonowerConnect:
 
     # "compute_classification" : False forced to false (for svm computation)
     def upload_medias(self, list_filenames, portfolio_id = 0, upload_small = False, hashtags = [], verbose = False, arg_aux = {}, compute_classification = False, auto_treatment = True,
-                      datou_current_id = 0) :
+                      datou_current_id = 0 ,is_live = False , list_datou_ids = []) :
       try :
         if verbose:
             print("in upload media")
@@ -243,6 +250,20 @@ class FotonowerConnect:
 
             data_to_send = {'portfolio_id':portfolio_id, "upload_small" : upload_small, "compute_classification" : compute_classification, "hashtags":";".join(hashtags)}
             data_to_send.update(arg_aux)
+            if len(list_datou_ids) != 0 :
+                csv_datou_ids = "\",\"".join([str(item) for item in list_datou_ids])
+                str_compute_classification = "{'list_datou_ids':["+csv_datou_ids+"]"
+                #, 'is_live': true}
+                if is_live :
+                    str_is_live = ", 'is_live': true}"
+                else :
+                    str_is_live = ", 'is_live': false}"
+                str_compute_classification += str_is_live
+                data_to_send["compute_classification"]  = str_compute_classification
+
+                print("mettre a jour le compute_classification : ")
+                print(str(data_to_send))
+
             if verbose:
                 print("after data_to_send, before sending request")
             r = requests.post(url, files=files, data=data_to_send)
@@ -283,7 +304,7 @@ class FotonowerConnect:
                         print ("Some filename were not uploaded !")
                 #return res_json['photo_id']
                     if len(list_filenames) > 0 :
-                        return {list_filenames[0]:res_json['photo_id']},dict_cur
+                        return {list_filenames[0]:res_json['photo_id'],"res_json":res_json},dict_cur
                     else :
                         return {},{}
             else :
@@ -416,3 +437,6 @@ class FotonowerConnect:
                 print("Result OK")
             return json.loads(r.content)
         return {}
+
+
+
