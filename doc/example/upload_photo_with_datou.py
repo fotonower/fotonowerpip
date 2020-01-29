@@ -2,7 +2,7 @@ __author__ = 'moilerat'
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import mtr.lib.fotonower_api.fotonower_connect as ftn
+import ftn
 import os
 
 if __name__ == "__main__":
