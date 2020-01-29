@@ -193,12 +193,17 @@ class FotonowerConnect:
         return portfolio_id
 
     # "compute_classification" : False forced to false (for svm computation)
-    def upload_medias(self, list_filenames, portfolio_id = 0, upload_small = False, hashtags = [], verbose = False, arg_aux = {}, compute_classification=False, auto_treatment=True) :
+    def upload_medias(self, list_filenames, portfolio_id = 0, upload_small = False, hashtags = [], verbose = False, arg_aux = {}, compute_classification = False, auto_treatment = True,
+                      datou_current_id = 0) :
       try :
         if verbose:
             print("in upload media")
             sys.stdout.flush()
         url = self.protocol+ "://" + self.host + self.api_version + self.upload_endpoint + "?" + self.token_arg + "=" + self.token
+
+        if datou_current_id != 0:
+            url += "&datou_current_id=" + str(datou_current_id)
+
         if not auto_treatment:
             url += "&datou=0"
         if verbose :
@@ -278,7 +283,7 @@ class FotonowerConnect:
                         print ("Some filename were not uploaded !")
                 #return res_json['photo_id']
                     if len(list_filenames) > 0 :
-                        return {list_filenames[0]:res_json['photo_id']},{}
+                        return {list_filenames[0]:res_json['photo_id']},dict_cur
                     else :
                         return {},{}
             else :
@@ -392,12 +397,13 @@ class FotonowerConnect:
             return json.loads(r.content)
         return {}
 
-    def get_datou_result(self,mtr_portfolio_id = 0,list_current_ids_csv = "",limit=20,offset=0, verbose = False):
+    def get_datou_result(self,mtr_portfolio_id = 0, datou_current_ids_dict = None,limit=20,offset=0, verbose = False):
         url = self.protocol + "://" + self.host + self.api_version +self.get_result +"?"
         list_param = ["token="+ self.token]
         if mtr_portfolio_id != 0:
             list_param.append("mtr_portfolio_id="+str(mtr_portfolio_id))
-        if list_current_ids_csv != "":
+        if datou_current_ids_dict != "":
+            list_current_ids_csv = ','.join(map(str, datou_current_ids_dict["list_datou_current"]))
             list_param.append("datou_current_ids="+list_current_ids_csv)
         if limit != 0:
             list_param.append("limit=" + str(limit))
