@@ -439,15 +439,9 @@ class FotonowerConnect:
 
             json_param = {}
             try :
-                try :
-                    from StringIO import StringIO
-                except Exception as ee :
-                    from io import StringIO
-
-                    json_param = json.load(StringIO(r.content))
+                json_param = json.loads(r.content.decode("utf8"))
             except Exception as e :
-                    print("Error in json parser in datou_step create in datou create: " + str(e))
-
+                print("Error in json parser in datou_step create in datou create: " + str(e))
 
             return json_param
         return {}
