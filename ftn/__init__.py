@@ -58,12 +58,12 @@ class FotonowerConnect:
 #        r = requests.get(url, data={'portfolio_name':portfolio_name, "access_token" : self.token})
         r = requests.get(url)
 
-        #portfolio_id = 0
+        portfolio_id = None
 
         if r.status_code == 200 :
             res_json = json.loads(r.content.decode("utf8"))
             if verbose :
-                print (res_json)
+                print("res_json : {}".format(res_json))
             #portfolio_id = res_json['portfolio_id']
             if type(res_json) == type(0) :
                 portfolio_id = res_json
@@ -76,7 +76,13 @@ class FotonowerConnect:
             print (" Content : " + str(r.content))
             print (" All Response : " + str(r))
 
+        if portfolio_id is None:
+            portfolio_id = 0
+            print(" WARNING : NO PORTFOLIO CREATED portfolio_id {} used instead of new portfolio".format(portfolio_id))
+            sys.stdout.flush()
+
         return portfolio_id
+
 
     def create_portfolio(self, portfolio_name, list_photo_ids = [], verbose = False, arg_aux = {}):
 
